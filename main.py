@@ -47,49 +47,69 @@ class Fighter:
         self.alive = True
         self.flip = flip
 
-        # Animações: 0 - idle, 1 - ataque
-        self.animation_list = self.load_animations()
-        self.action = 0
+        self.animations = self.load_animations()
+        self.action = "idle"
         self.frame_index = 0
-        self.image = self.animation_list[self.action][self.frame_index]
+        self.image = self.animations[self.action][self.frame_index]
         self.update_time = pygame.time.get_ticks()
 
         self.rect = self.image.get_rect()
         self.rect.center = (x, y)
 
     def load_animations(self):
-        """Carrega animações 'idle' e 'attack' do personagem."""
-        animation_list = []
+        """Carrega todas as animações disponíveis do lutador."""
+        animations = {}
+        animation_types = ["idle", "attack", "hurt", "death"]
 
-        for animation_type in ["idle", "attack"]:
-            temp_list = []
-            for i in range(8):  # Suporte para 8 frames
-                path = f"./sprites/{self.name}/{animation_type}/{i}.png"
+        for animation_type in animation_types:
+            frames = []
+            folder = f".\\sprites\\{self.name}\\{animation_type}"
+            if not os.path.exists(folder):
+                continue
+            for file_name in sorted(os.listdir(folder), key=lambda x: int(x.split(".")[0])):
+                path = os.path.join(folder, file_name)
                 img = pygame.image.load(path)
                 img = pygame.transform.scale(img, (img.get_width() * 2, img.get_height() * 2))
                 if self.flip:
                     img = pygame.transform.flip(img, True, False)
-                temp_list.append(img)
-            animation_list.append(temp_list)
+                frames.append(img)
+            animations[animation_type] = frames
 
-        return animation_list
+        return animations
+    
+    def set_action(self, action_name):
+        """Troca para uma nova animação se diferente da atual."""
+        if action_name != self.action:
+            self.action = action_name
+            self.frame_index = 0
+            self.update_time = pygame.time.get_ticks()
 
     def update(self):
         """Atualiza a animação atual do lutador."""
         animation_cooldown = 100
-        self.image = self.animation_list[self.action][self.frame_index]
+        frames = self.animations.get(self.action, [])
+
+        if not frames:
+            return
+        
         if pygame.time.get_ticks() - self.update_time > animation_cooldown:
             self.update_time = pygame.time.get_ticks()
             self.frame_index += 1
 
-        if self.frame_index >= len(self.animation_list[self.action]):
-            self.idle()
+            if self.frame_index >= len(frames):
+                if self.action in ("attack", "hurt"):
+                    self.set_action("idle")
+                    frames = self.animations.get(self.action, [])
+                    self.frame_index = 0
+                elif self.action == "death":
+                    self.frame_index = len(frames) - 1
+
+        if self.frame_index < len(frames):
+            self.image = frames[self.frame_index]
 
     def idle(self):
         """Volta a animação para idle."""
-        self.action = 0
-        self.frame_index = 0
-        self.update_time = pygame.time.get_ticks()
+        self.set_action("idle")
 
     def attack(self, target):
         """Realiza um ataque contra um alvo."""
@@ -98,10 +118,10 @@ class Fighter:
         target.hp = max(target.hp - damage, 0)
         if target.hp == 0:
             target.alive = False
-
-        self.action = 1  # alterna para animação de ataque
-        self.frame_index = 0
-        self.update_time = pygame.time.get_ticks()
+            target.set_action("death")
+        else:
+            target.set_action("hurt")
+        self.set_action("attack")
 
     def draw(self):
         """Desenha o lutador na tela."""
