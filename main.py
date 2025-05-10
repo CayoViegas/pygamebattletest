@@ -18,6 +18,7 @@ RED, GREEN, WHITE = (255, 0, 0), (0, 255, 0), (255, 255, 255)
 # CARREGAMENTO DE IMAGENS
 background_image = pygame.image.load("background.png").convert_alpha()
 panel_image = pygame.image.load("panel.png").convert_alpha()
+shield_icon = pygame.image.load(".\\sprites\\utils\\shield.png").convert_alpha()
 
 # FUNÇÕES DE DESENHO
 def draw_text(text, font, color, x, y):
@@ -42,6 +43,7 @@ class Fighter:
         self.name = name
         self.max_hp = max_hp
         self.hp = max_hp
+        self.defending = False
         self.strength = strength
         self.potions = potions
         self.alive = True
@@ -117,17 +119,28 @@ class Fighter:
         """Realiza um ataque contra um alvo."""
         rand = random.randint(-5, 5)
         damage = self.strength + rand
+
+        if target.defending:
+            damage = max(damage // 2, 1) # Reduz o dano pela metade, mínimo 1
+
         target.hp = max(target.hp - damage, 0)
         if target.hp == 0:
             target.alive = False
             target.set_action("death")
         else:
             target.set_action("hurt")
+
         self.set_action("attack")
 
     def draw(self):
         """Desenha o lutador na tela."""
         screen.blit(self.image, self.rect)
+
+        # Se estiver defendendo, desenha o escudo
+        if self.defending and self.alive:
+            shield_x = self.rect.centerx - shield_icon.get_width() // 2
+            shield_y = self.rect.top - shield_icon.get_height()
+            screen.blit(shield_icon, (shield_x, shield_y))
 
 # CLASSE DE BARRA DE VIDA
 class HealthBar:
@@ -211,6 +224,7 @@ while run:
         if action_cooldown >= action_wait_time:
             if fighters[1].alive:
                 fighters[1].attack(fighters[0])
+            fighters[0].defending = False
             current_fighter = 0
             action_cooldown = 0
             player_turn = True
@@ -236,7 +250,7 @@ while run:
                         action_cooldown = 0
                         state_stack = ["battle"]
                     elif selected == "Defender":
-                        print(f"{fighters[0].name} está defendendo!")
+                        fighters[0].defending = True
                         player_turn = False
                         action_cooldown = 0
                         state_stack = ["battle"]
